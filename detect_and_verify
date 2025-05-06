@@ -1,0 +1,47 @@
+# File: detect_and_verify.py
+import pickle
+import face_recognition
+import cv2
+import numpy as np
+from transformers import pipeline, RagTokenizer, RagRetriever, RagSequenceForGeneration
+from config import KNOWN_FACES_PATH, DEEPFAKE_MODEL, RAG_MODEL_NAME, PASSAGES_PATH, INDEX_PATH
+
+# Load deepfake detector
+_detector = pipeline("image-classification", model=DEEPFAKE_MODEL)
+
+# Load face recognition data
+with open(KNOWN_FACES_PATH,"rb") as f:
+    _known_encodings, _known_names = pickle.load(f)
+
+# Load RAG
+tokenizer = RagTokenizer.from_pretrained(RAG_MODEL_NAME)
+retriever = RagRetriever.from_pretrained(RAG_MODEL_NAME, index_name="custom", passages_path=PASSAGES_PATH, index_path=INDEX_PATH)
+rag_model = RagSequenceForGeneration.from_pretrained(RAG_MODEL_NAME, retriever=retriever)
+
+def detect_and_verify(image_path):
+    # Deepfake detection
+    res = _detector(image_path)[0]
+    label, score = res["label"], res["score"]
+    is_fake = (label.lower() == "fake")
+
+    # Face recognition
+    img = face_recognition.load_image_file(image_path)
+    locs = face_recognition.face_locations(img)
+    if not locs:
+        person = None
+    else:
+        enc = face_recognition.face_encodings(img, locs)[0]
+        dists = face_recognition.face_distance(_known_encodings, enc)
+        idx = np.argmin(dists)
+        person = _known_names[idx] if dists[idx]<0.6 else None
+
+    # RAG verification
+    if person:
+        query = f"{person}의 최근 활동이나 진위에 대한 정보를 알려줘."
+        inputs = tokenizer(query, return_tensors="pt")
+        out = rag_model.generate(**inputs)
+        context = tokenizer.batch_decode(out, skip_special_tokens=True)[0]
+    else:
+        context = None
+
+    return {"person": person, "deepfake": is_fake, "score": score, "context": context}
