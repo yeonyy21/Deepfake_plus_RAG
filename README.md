@@ -6,6 +6,7 @@ Retrieval‑Augmented **Deepfake Detection + Verification**
 
 실존 인물이라면 외부 지식(위키·뉴스)을 RAG로 검색해 **팩트체크**까지 수행합니다.
 
+```bash
 deepfake_rag/
 ├── requirements.txt # 의존 라이브러리
 ├── [config.py](http://config.py/) # 경로·모델 설정
@@ -20,6 +21,7 @@ deepfake_rag/
 ├── faiss_index
 ├── known_faces.pkl
 └── known_faces_images/ # ★손흥민.jpg 등 넣기
+```
 
 ## 2. 외부 지식 구축
 
